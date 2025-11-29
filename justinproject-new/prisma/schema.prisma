@@ -1,0 +1,77 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "darwin-arm64"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String   @id @default(uuid())
+  email             String   @unique
+  passwordHash      String
+  failedLoginAttempts Int     @default(0)
+  lastFailedLogin   DateTime?
+  accountLocked     Boolean  @default(false)
+  lockUntil         DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Security related fields
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+  emailVerified     Boolean  @default(false)
+  
+  // 2FA fields
+  twoFactorEnabled  Boolean  @default(false)
+  twoFactorSecret   String?
+  
+  // Audit trail
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
+}
+
+model SecurityLog {
+  id          String   @id @default(uuid())
+  timestamp   DateTime @default(now())
+  level       String   // 'info', 'warning', 'error', 'critical'
+  event       String   // 'login_attempt', 'login_success', 'login_failure', 'sql_injection_attempt'
+  ipAddress   String?
+  userId      String?
+  userEmail   String?
+  description String
+  metadata    String?  // JSON stringified additional data
+}
+
+model HoneypotInteraction {
+  id          String   @id @default(uuid())
+  timestamp   DateTime @default(now())
+  ipAddress   String
+  userAgent   String?
+  attackType  String   // 'sql_injection', 'xss', 'command_injection', etc.
+  payload     String   // The malicious payload attempted
+  endpoint    String?  // Which endpoint was targeted
+  method      String?  // HTTP method used
+  response    String?  // What fake data was returned
+  metadata    String?  // JSON stringified additional data
+}
+
+model IDSAlert {
+  id          String   @id @default(uuid())
+  timestamp   DateTime @default(now())
+  severity    String   // 'low', 'medium', 'high', 'critical'
+  alertType   String   // 'sql_injection', 'brute_force', 'suspicious_activity', etc.
+  title       String
+  description String
+  ipAddress   String?
+  userId      String?
+  status      String   @default("open") // 'open', 'investigating', 'resolved', 'false_positive'
+  assignedTo String?  // Blue hat team member assigned
+  metadata    String?  // JSON stringified additional data
+  resolvedAt  DateTime?
+}
