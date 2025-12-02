@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Database, AlertTriangle, Users, Activity, FileText, Download, BarChart, Lock, Eye, EyeOff } from 'lucide-react';
+import { Database, AlertTriangle, FileText, Download, BarChart, Lock, Eye, EyeOff } from 'lucide-react';
+import { apiService } from '../services/api';
 
 const AdminPage: React.FC = () => {
   // Realistic user data from Kaggle-style dataset
@@ -32,14 +33,51 @@ const AdminPage: React.FC = () => {
     }
   };
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminCredentials.username === 'admin' && adminCredentials.password === 'admin@123') {
-      setShowDatabase(true);
-      setShowAdminLogin(false);
-      setLoginError('');
-    } else {
-      setLoginError('Invalid credentials. Please try again.');
+    
+    // SQL injection detection patterns (same as main login)
+    const sqlPatterns = [
+      /(\%27)|(\')|(\-\-)|(\%23)|(#)/i,
+      /((\%3D)|(=))[^\n]*((\%27)|(\')|(\-\-)|(\%3B)|(;))/i,
+      /\w*((\%27)|(\'))((\%6F)|o|(\%4F))((\%72)|r|(\%52))/i,
+      /((\%27)|(\'))union/i,
+      /exec(\s|\+)+(s|x)p\w+/i,
+      /UNION(\s+)ALL(\s+)SELECT/i,
+      /INSERT|UPDATE|DELETE|DROP|ALTER|TRUNCATE/i,
+      /SELECT.*FROM/i,
+      /SLEEP\(\d+\)/i,
+      /BENCHMARK\(\d+,.*\)/i,
+      /WAITFOR DELAY/i
+    ];
+
+    const hasSqlInjection = sqlPatterns.some(pattern =>
+      pattern.test(adminCredentials.username) || pattern.test(adminCredentials.password)
+    );
+
+    if (hasSqlInjection) {
+      setLoginError('⚠️ SQL Injection attempt detected! Your incident has been logged.');
+      // Still send to backend for logging and IDS alert creation
+      try {
+        await apiService.adminLogin(adminCredentials.username, adminCredentials.password);
+      } catch (err) {
+        // Error already logged on backend
+      }
+      return;
+    }
+    
+    try {
+      const response = await apiService.adminLogin(adminCredentials.username, adminCredentials.password);
+      
+      if (response.authenticated) {
+        setShowDatabase(true);
+        setShowAdminLogin(false);
+        setLoginError('');
+      } else {
+        setLoginError('Invalid credentials. Please try again.');
+      }
+    } catch (err) {
+      setLoginError((err as Error).message || 'Invalid credentials. Please try again.');
     }
   };
 

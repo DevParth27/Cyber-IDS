@@ -127,6 +127,19 @@ class ApiService {
     return response.data.user;
   }
 
+  async adminLogin(username: string, password: string): Promise<{ authenticated: boolean }> {
+    const response = await this.request<{ authenticated: boolean }>('/api/auth/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (!response.success || !response.data) {
+      throw new Error(response.message || 'Admin login failed');
+    }
+
+    return response.data;
+  }
+
   isAuthenticated(): boolean {
     return !!this.getAuthToken();
   }
